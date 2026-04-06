@@ -128,11 +128,12 @@ export class SceneManager {
   }
 
   mniToScene(pos) {
+    if (!pos || !Array.isArray(pos)) return new THREE.Vector3(0, 0, 0);
     const s = this._brainScale || 1;
     return new THREE.Vector3(
-      pos[0] * s * 0.012,
-      pos[2] * s * 0.012,
-      -pos[1] * s * 0.012
+      (pos[0] || 0) * s * 0.012,
+      (pos[2] || 0) * s * 0.012,
+      -(pos[1] || 0) * s * 0.012
     );
   }
 

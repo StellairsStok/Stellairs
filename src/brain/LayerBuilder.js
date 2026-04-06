@@ -13,68 +13,72 @@ export function buildLayer(category, sceneManager) {
   const type = category.render_type;
 
   for (const s of category.structures) {
-    const container = new THREE.Group();
-    container.name = s.name_en;
+    try {
+      const container = new THREE.Group();
+      container.name = s.name_en || 'unknown';
 
-    let mesh;
+      // Resolve position: use position field, or midpoint of points for tubes
+      const structPos = s.position || (s.points && s.points.length > 0 ? s.points[Math.floor(s.points.length / 2)] : [0, 0, 0]);
 
-    if (type === 'tube' && s.points) {
-      mesh = createTube(s, sceneManager);
-    } else if (type === 'transparent_volume') {
-      mesh = createEllipsoid(s, sceneManager, s.opacity ?? 0.35);
-    } else if (type === 'surface_region') {
-      mesh = createSurfaceRegion(s, sceneManager);
-    } else if (type === 'surface_marker' || type === 'nerve_marker') {
-      mesh = createMarker(s, sceneManager, type === 'nerve_marker' ? 0.02 : 0.025);
-    } else {
-      mesh = createEllipsoid(s, sceneManager, 0.85);
-    }
+      let mesh;
 
-    if (!mesh) continue;
+      if (type === 'tube' && s.points) {
+        mesh = createTube(s, sceneManager);
+      } else if (type === 'transparent_volume') {
+        mesh = createEllipsoid(structPos, s, sceneManager, s.opacity ?? 0.35);
+      } else if (type === 'surface_region') {
+        mesh = createSurfaceRegion(structPos, s, sceneManager);
+      } else if (type === 'surface_marker' || type === 'nerve_marker') {
+        mesh = createMarker(structPos, s, sceneManager, type === 'nerve_marker' ? 0.02 : 0.025);
+      } else {
+        mesh = createEllipsoid(structPos, s, sceneManager, 0.85);
+      }
 
-    // Store data on interactive meshes
-    if (mesh.isMesh) {
-      mesh.userData = { ...s, categoryId: category.id };
-      container.add(mesh);
-    } else if (mesh.isGroup) {
-      mesh.traverse(child => {
-        if (child.isMesh) child.userData = { ...s, categoryId: category.id };
+      if (!mesh) continue;
+
+      // Store data on interactive meshes
+      if (mesh.isMesh) {
+        mesh.userData = { ...s, categoryId: category.id, position: structPos };
+        container.add(mesh);
+      } else if (mesh.isGroup) {
+        mesh.traverse(child => {
+          if (child.isMesh) child.userData = { ...s, categoryId: category.id, position: structPos };
+        });
+        container.add(mesh);
+      }
+
+      // Leader line + label outside brain
+      const pos = sceneManager.mniToScene(structPos);
+      const labelOffset = computeLabelOffset(structPos);
+      const labelPos = sceneManager.mniToScene(labelOffset);
+
+      // Leader line
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([pos, labelPos]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: s.color,
+        transparent: true,
+        opacity: 0.5,
       });
-      container.add(mesh);
+      const line = new THREE.Line(lineGeo, lineMat);
+      line.renderOrder = 999;
+      container.add(line);
+
+      // Dot at leader line endpoint
+      const dotGeo = new THREE.SphereGeometry(0.006, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color: s.color });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.position.copy(labelPos);
+      container.add(dot);
+
+      // CSS2D Label
+      const label = createLabel(s.name_cn, s.color);
+      label.position.copy(labelPos);
+      container.add(label);
+
+      group.add(container);
+    } catch (err) {
+      console.warn('Failed to build structure:', s.name_en, err);
     }
-
-    // For tubes, compute midpoint from points array; otherwise use position
-    const structPos = s.position || (s.points ? s.points[Math.floor(s.points.length / 2)] : [0, 0, 0]);
-
-    // Leader line + label outside brain
-    const pos = sceneManager.mniToScene(structPos);
-    const labelOffset = computeLabelOffset(structPos);
-    const labelPos = sceneManager.mniToScene(labelOffset);
-
-    // Leader line
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([pos, labelPos]);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: s.color,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const line = new THREE.Line(lineGeo, lineMat);
-    line.renderOrder = 999;
-    container.add(line);
-
-    // Dot at leader line endpoint
-    const dotGeo = new THREE.SphereGeometry(0.006, 8, 8);
-    const dotMat = new THREE.MeshBasicMaterial({ color: s.color });
-    const dot = new THREE.Mesh(dotGeo, dotMat);
-    dot.position.copy(labelPos);
-    container.add(dot);
-
-    // CSS2D Label
-    const label = createLabel(s.name_cn, s.color);
-    label.position.copy(labelPos);
-    container.add(label);
-
-    group.add(container);
   }
 
   return group;
@@ -95,8 +99,8 @@ function computeLabelOffset(mniPos) {
   ];
 }
 
-function createSurfaceRegion(s, sm) {
-  const pos = sm.mniToScene(s.position);
+function createSurfaceRegion(structPos, s, sm) {
+  const pos = sm.mniToScene(structPos);
   const sc = s.scale || [0.15, 0.15, 0.15];
   const geo = new THREE.SphereGeometry(1, 24, 24);
   const mat = new THREE.MeshPhysicalMaterial({
@@ -113,8 +117,8 @@ function createSurfaceRegion(s, sm) {
   return mesh;
 }
 
-function createEllipsoid(s, sm, opacity = 0.85) {
-  const pos = sm.mniToScene(s.position);
+function createEllipsoid(structPos, s, sm, opacity = 0.85) {
+  const pos = sm.mniToScene(structPos);
   const sc = s.scale || [0.03, 0.03, 0.03];
   const geo = new THREE.SphereGeometry(1, 20, 20);
   const mat = new THREE.MeshPhysicalMaterial({
@@ -133,8 +137,8 @@ function createEllipsoid(s, sm, opacity = 0.85) {
   return mesh;
 }
 
-function createMarker(s, sm, size = 0.025) {
-  const pos = sm.mniToScene(s.position);
+function createMarker(structPos, s, sm, size = 0.025) {
+  const pos = sm.mniToScene(structPos);
   const outerGeo = new THREE.SphereGeometry(size, 16, 16);
   const outerMat = new THREE.MeshPhysicalMaterial({
     color: s.color, transparent: true, opacity: 0.5,

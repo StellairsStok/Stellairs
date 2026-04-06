@@ -87,7 +87,13 @@ export class App {
     const topbar = document.getElementById('topbar');
 
     for (const category of brainData.categories) {
-      const group = buildLayer(category, this.sceneManager);
+      let group;
+      try {
+        group = buildLayer(category, this.sceneManager);
+      } catch (err) {
+        console.error('Failed to build layer:', category.id, err);
+        continue;
+      }
       this.sceneManager.addLayer(category.id, group);
 
       if (category.default_visible) {
