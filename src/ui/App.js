@@ -1,10 +1,4 @@
 import { SceneManager } from '../interaction/SceneManager.js';
-import { BrainModel } from '../brain/BrainModel.js';
-import { BrainRaycaster } from '../interaction/Raycaster.js';
-import { CategoryTabs } from './CategoryTabs.js';
-import { ColorLegend } from './ColorLegend.js';
-import { InfoPanel } from './InfoPanel.js';
-import { LoadingScreen } from './LoadingScreen.js';
 
 export class App {
   constructor(root) {
@@ -18,81 +12,56 @@ export class App {
         <h1 class="app-title">BrainAtlas</h1>
         <span class="app-subtitle">3D 大脑解剖</span>
       </header>
-      <div id="category-tabs"></div>
-      <div class="viewport" id="viewport"></div>
-      <div id="color-legend"></div>
-      <div id="info-panel"></div>
+      <div class="viewport" id="viewport">
+        <div class="loading-screen" id="loading">
+          <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">正在加载大脑模型...</div>
+          </div>
+        </div>
+      </div>
+      <div class="controls-hint" id="controls-hint">
+        <span>拖动旋转 · 双指缩放</span>
+      </div>
     `;
 
     this.viewportEl = document.getElementById('viewport');
-
-    // Loading screen
-    this.loadingScreen = new LoadingScreen(this.viewportEl);
-
-    // Scene
     this.sceneManager = new SceneManager(this.viewportEl);
-
-    // UI components
-    this.categoryTabs = new CategoryTabs(document.getElementById('category-tabs'));
-    this.colorLegend = new ColorLegend(document.getElementById('color-legend'));
-    this.infoPanel = new InfoPanel(document.getElementById('info-panel'));
-
-    // Build brain
-    this._initBrain();
+    this._loadBrain();
   }
 
-  async _initBrain() {
+  async _loadBrain() {
+    const loading = document.getElementById('loading');
+    const loadingText = loading?.querySelector('.loading-text');
+
     try {
-      this.brainModel = new BrainModel(this.sceneManager.scene);
-
-      await this.brainModel.build((progress) => {
-        this.loadingScreen.setProgress(progress);
-      });
-
-      // Set up raycaster for interaction
-      this.raycaster = new BrainRaycaster(
-        this.sceneManager.camera,
-        this.sceneManager.renderer,
-        this.brainModel
-      );
-
-      this.raycaster.onRegionSelected((userData) => {
-        this.infoPanel.show(userData);
-      });
-
-      this.raycaster.onRegionDeselected(() => {
-        this.infoPanel.hide();
-      });
-
-      // Category tab switching
-      this.categoryTabs.onChange((categoryId) => {
-        this.brainModel.switchCategory(categoryId);
-        this.colorLegend.update(categoryId);
-        this.infoPanel.hide();
-        // Stop auto-rotate when user picks a category
-        this.sceneManager.controls.autoRotate = true;
-      });
-
-      // Default to lobes
-      this.categoryTabs.setActive('lobes');
-      this.brainModel.switchCategory('lobes');
-      this.colorLegend.update('lobes');
+      const basePath = import.meta.env.BASE_URL || './';
+      const model = await this.sceneManager.loadModel(`${basePath}brain.glb`);
+      this.brainModel = model;
 
       // Hide loading
-      this.loadingScreen.hide();
+      if (loading) {
+        loading.classList.add('fade-out');
+        setTimeout(() => loading.remove(), 500);
+      }
 
+      // Hide hint after a few seconds
+      const hint = document.getElementById('controls-hint');
+      if (hint) {
+        setTimeout(() => {
+          hint.classList.add('fade-out');
+          setTimeout(() => hint.remove(), 500);
+        }, 4000);
+      }
     } catch (err) {
-      console.error('Failed to build brain model:', err);
-      const loadingText = this.viewportEl.querySelector('.loading-text');
+      console.error('Failed to load brain model:', err);
       if (loadingText) {
-        loadingText.textContent = '模型构建失败，请刷新重试';
+        loadingText.textContent = '加载失败，请刷新重试';
       }
     }
   }
 
   dispose() {
-    this.raycaster?.dispose();
-    this.brainModel?.dispose();
     this.sceneManager?.dispose();
   }
 }
