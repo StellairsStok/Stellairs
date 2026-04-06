@@ -120,35 +120,22 @@ export function paintBrain(brainWrapper, mode, activeRegions = null) {
       geo.setAttribute('color', colorAttr);
     }
 
-    // Get the world matrix to convert local positions to world positions
-    child.updateWorldMatrix(true, false);
-    const worldMatrix = child.matrixWorld;
     const pos = new THREE.Vector3();
 
-    // The model offset applied in SceneManager:
-    // model.position.set(-center.x, -center.y, -center.z)
-    // wrapper.scale.setScalar(brainScale)
-    // So to get back to original model coords:
-    // originalPos = (worldPos / brainScale) + center
-
-    const brainScale = brainWrapper.scale.x; // uniform scale
-    const modelChild = brainWrapper.children[0]; // the actual model
-    const offsetX = -modelChild.position.x;
-    const offsetY = -modelChild.position.y;
-    const offsetZ = -modelChild.position.z;
+    // Vertex positions in GLB are in original model space.
+    // Model coordinate system (from GLB bounding box analysis):
+    //   Model X = MNI X + 5.3   (left/right)
+    //   Model Y = MNI Z + 90.1  (inferior/superior)
+    //   Model Z = MNI Y + 32.2  (posterior/anterior)
+    // Inverse: MNI X = ModelX - CX, MNI Y = ModelZ - CZ, MNI Z = ModelY - CY
 
     for (let i = 0; i < count; i++) {
       pos.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
 
-      // Convert to original model coords (before centering)
-      const modelX = pos.x + offsetX;
-      const modelY = pos.y + offsetY;
-      const modelZ = pos.z + offsetZ;
-
-      // Convert model coords to MNI
-      const mniX = modelX - CX;
-      const mniY = modelZ - CZ; // model Z → MNI Y
-      const mniZ = modelY - CY; // model Y → MNI Z
+      // Convert vertex model coords directly to MNI
+      const mniX = pos.x - CX;    // model X → MNI X
+      const mniY = pos.z - CZ;    // model Z → MNI Y
+      const mniZ = pos.y - CY;    // model Y → MNI Z
 
       let color = DEFAULT_COLOR;
 
