@@ -127,13 +127,21 @@ export class SceneManager {
     });
   }
 
+  /**
+   * Convert MNI coordinates to scene space.
+   * MNI: X=left(-)/right(+), Y=posterior(-)/anterior(+), Z=inferior(-)/superior(+)
+   * Scene: X=right, Y=up, Z=toward camera (front)
+   * Brain model after normalization spans ~2 units ([-1,1] on longest axis).
+   * MNI coords span ~±80mm, so factor ≈ 1/80 = 0.0125
+   * DO NOT multiply by _brainScale (model already normalized).
+   */
   mniToScene(pos) {
     if (!pos || !Array.isArray(pos)) return new THREE.Vector3(0, 0, 0);
-    const s = this._brainScale || 1;
+    const f = 0.011; // ~1/90, maps MNI mm to normalized scene units
     return new THREE.Vector3(
-      (pos[0] || 0) * s * 0.012,
-      (pos[2] || 0) * s * 0.012,
-      -(pos[1] || 0) * s * 0.012
+      (pos[0] || 0) * f,   // MNI X → scene X (left/right)
+      (pos[2] || 0) * f,   // MNI Z → scene Y (bottom/top)
+      (pos[1] || 0) * f    // MNI Y → scene Z (back/front, positive = anterior = toward camera)
     );
   }
 
