@@ -16,48 +16,54 @@ export class App {
         <div class="loading-screen" id="loading">
           <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-text">正在加载大脑模型...</div>
+            <div class="loading-text" id="loading-text">正在加载大脑模型...</div>
           </div>
         </div>
       </div>
     `;
 
-    this.viewportEl = document.getElementById('viewport');
-    this.sceneManager = new SceneManager(this.viewportEl);
-
-    this._loadBrain();
+    // Wait for layout to be ready before initializing Three.js
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this._init();
+      });
+    });
   }
 
-  async _loadBrain() {
-    try {
-      const basePath = import.meta.env.BASE_URL || '/';
-      this.brainModel = await this.sceneManager.loadModel(`${basePath}brain.glb`);
+  async _init() {
+    const viewport = document.getElementById('viewport');
+    const loadingText = document.getElementById('loading-text');
 
-      // Apply a nice brain material to all meshes
+    try {
+      this.sceneManager = new SceneManager(viewport);
+
+      // Use absolute URL based on current page location
+      const modelUrl = new URL('brain.glb', window.location.href).href;
+      this.brainModel = await this.sceneManager.loadModel(modelUrl);
+
+      // Apply brain material
       this.brainModel.traverse((child) => {
         if (child.isMesh) {
           child.material = child.material.clone();
-          // Keep original material colors if they exist, otherwise set brain color
           if (!child.material.map) {
             child.material.color.setHex(0xd4a0a0);
           }
           child.material.roughness = 0.6;
           child.material.metalness = 0.05;
-          child.material.side = 2; // DoubleSide
+          child.material.side = 2;
         }
       });
 
-      // Hide loading screen
+      // Hide loading
       const loading = document.getElementById('loading');
       if (loading) {
         loading.classList.add('fade-out');
         setTimeout(() => loading.remove(), 400);
       }
     } catch (err) {
-      console.error('Failed to load brain model:', err);
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.querySelector('.loading-text').textContent = '模型加载失败，请刷新重试';
+      console.error('BrainAtlas Error:', err);
+      if (loadingText) {
+        loadingText.textContent = '加载失败: ' + err.message;
       }
     }
   }

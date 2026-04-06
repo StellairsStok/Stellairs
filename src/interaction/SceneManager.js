@@ -6,27 +6,22 @@ export class SceneManager {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xfafbfc);
+
+    const w = container.clientWidth || window.innerWidth;
+    const h = container.clientHeight || window.innerHeight;
 
     // Renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(w, h);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.3;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
     // Camera
-    this.camera = new THREE.PerspectiveCamera(
-      45,
-      container.clientWidth / container.clientHeight,
-      0.01,
-      100
-    );
+    this.camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100);
     this.camera.position.set(0, 0.5, 2.5);
 
     // Controls
@@ -52,16 +47,13 @@ export class SceneManager {
     this._animating = true;
     this._animate();
 
-    // GLTF Loader
+    // Loader
     this.loader = new GLTFLoader();
   }
 
   _setupLights() {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambient);
-
-    const hemi = new THREE.HemisphereLight(0xddeeff, 0x8899aa, 0.5);
-    this.scene.add(hemi);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    this.scene.add(new THREE.HemisphereLight(0xddeeff, 0x8899aa, 0.5));
 
     const key = new THREE.DirectionalLight(0xffffff, 1.0);
     key.position.set(5, 5, 5);
@@ -74,16 +66,8 @@ export class SceneManager {
     const rim = new THREE.DirectionalLight(0xffffff, 0.3);
     rim.position.set(0, -2, -5);
     this.scene.add(rim);
-
-    const bottom = new THREE.DirectionalLight(0xffeedd, 0.2);
-    bottom.position.set(0, -5, 0);
-    this.scene.add(bottom);
   }
 
-  /**
-   * Load a GLB model and add to scene
-   * Returns the loaded model group
-   */
   loadModel(url) {
     return new Promise((resolve, reject) => {
       this.loader.load(
@@ -91,36 +75,34 @@ export class SceneManager {
         (gltf) => {
           const model = gltf.scene;
 
-          // Center and scale the model
+          // Center and scale
           const box = new THREE.Box3().setFromObject(model);
           const center = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 2.0 / maxDim; // Normalize to ~2 units
+          const scale = 2.0 / (maxDim || 1);
 
-          model.position.sub(center);
-          model.scale.setScalar(scale);
+          // Wrap in a group for clean transform
+          const wrapper = new THREE.Group();
+          wrapper.add(model);
+          model.position.set(-center.x, -center.y, -center.z);
+          wrapper.scale.setScalar(scale);
 
-          // Recalculate after centering
-          const newBox = new THREE.Box3().setFromObject(model);
-          const newCenter = newBox.getCenter(new THREE.Vector3());
-          this.controls.target.copy(newCenter);
+          this.scene.add(wrapper);
+          this.controls.target.set(0, 0, 0);
+          this.camera.position.set(0, 0.5, 2.5);
 
-          this.scene.add(model);
-          resolve(model);
+          resolve(wrapper);
         },
         undefined,
-        (error) => {
-          console.error('Error loading model:', error);
-          reject(error);
-        }
+        (error) => reject(new Error('GLB load failed: ' + (error?.message || error)))
       );
     });
   }
 
   _onResize() {
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
+    const w = this.container.clientWidth || window.innerWidth;
+    const h = this.container.clientHeight || window.innerHeight;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
