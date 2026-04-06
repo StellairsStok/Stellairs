@@ -6,6 +6,8 @@ export class SceneManager {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.brainModel = null;
+    this.scaleFactor = 0.00935; // default, updated after model load
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -81,8 +83,8 @@ export class SceneManager {
   }
 
   /**
-   * Load a GLB model and add to scene
-   * Returns the loaded model group
+   * Load a GLB model and add to scene.
+   * Returns the loaded model group and computes scaleFactor.
    */
   loadModel(url) {
     return new Promise((resolve, reject) => {
@@ -101,11 +103,17 @@ export class SceneManager {
           model.position.sub(center);
           model.scale.setScalar(scale);
 
+          // Compute scaleFactor for MNI coordinate mapping
+          // The raw model spans maxDim units, normalized to 2.0
+          // MNI coords span roughly the same range as raw model coords
+          this.scaleFactor = scale;
+
           // Recalculate after centering
           const newBox = new THREE.Box3().setFromObject(model);
           const newCenter = newBox.getCenter(new THREE.Vector3());
           this.controls.target.copy(newCenter);
 
+          this.brainModel = model;
           this.scene.add(model);
           resolve(model);
         },
@@ -116,6 +124,29 @@ export class SceneManager {
         }
       );
     });
+  }
+
+  /**
+   * Set the brain model opacity (ghost mode for deep structures)
+   */
+  setBrainOpacity(opacity) {
+    if (!this.brainModel) return;
+    this.brainModel.traverse((child) => {
+      if (child.isMesh) {
+        child.material.transparent = true;
+        child.material.opacity = opacity;
+        child.material.depthWrite = opacity >= 0.5;
+        child.material.needsUpdate = true;
+        child.visible = opacity > 0;
+      }
+    });
+  }
+
+  /**
+   * Add a group to the scene
+   */
+  addGroup(group) {
+    this.scene.add(group);
   }
 
   _onResize() {

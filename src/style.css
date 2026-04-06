@@ -1,91 +1,196 @@
-/* ===== Design System ===== */
+/* ============================================
+   Brain Atlas — Dark Theme Stylesheet
+   ============================================ */
+
+/* --- Custom Properties --- */
 :root {
-  --bg-primary: #FAFBFC;
-  --bg-card: #FFFFFF;
-  --text-primary: #1A1A2E;
-  --text-secondary: #6B7280;
-  --text-tertiary: #9CA3AF;
-  --border-color: #E5E7EB;
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --radius-full: 9999px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
-  --transition-fast: 150ms ease;
-  --transition-normal: 300ms ease;
+  --bg-primary: #0f0f1a;
+  --bg-card: #1a1a2e;
+  --bg-sidebar: #12122a;
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a8;
+  --text-tertiary: #5a5a7a;
+  --accent: #4A90D9;
+  --border: #2a2a4a;
+  --hover-bg: #252545;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* ===== Reset ===== */
-*, *::before, *::after {
+/* --- Reset --- */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: var(--font);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* --- App Shell --- */
 #app {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: var(--safe-top);
+  position: relative;
 }
 
-/* ===== Header ===== */
-.app-header {
+/* --- Sidebar (base / mobile-first) --- */
+.sidebar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  max-height: 65vh;
+  z-index: 50;
+  background: rgba(18, 18, 42, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top: 1px solid var(--border);
+  transition: height 300ms ease;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 12px 20px 8px;
+  flex-direction: column;
+  padding-bottom: var(--safe-bottom);
+}
+
+.sidebar.expanded {
+  height: 65vh;
+}
+
+/* --- Sidebar Header --- */
+.sidebar-header {
+  padding: 14px 20px 10px;
   flex-shrink: 0;
 }
 
-.app-title {
-  font-size: 20px;
+.sidebar-header h1 {
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: 0.3px;
 }
 
-.app-subtitle {
-  font-size: 13px;
+.sidebar-header p {
+  font-size: 12px;
   color: var(--text-tertiary);
-  font-weight: 400;
+  margin-top: 2px;
 }
 
-/* ===== Viewport ===== */
+/* --- Sidebar Toggle (mobile only) --- */
+.sidebar-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #3a3a5a;
+}
+
+.sidebar-toggle-label {
+  font-size: 13px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+/* --- Category List --- */
+.category-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 12px 12px;
+  min-height: 0;
+}
+
+/* --- Category Item --- */
+.category-item {
+  min-height: 48px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 150ms ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.category-item:hover {
+  background: var(--hover-bg);
+}
+
+.category-item.active {
+  background: #252550;
+  border-left: 3px solid var(--accent);
+}
+
+/* --- Category Color Dot --- */
+.category-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* --- Category Label --- */
+.category-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Viewport --- */
 .viewport {
   flex: 1;
   position: relative;
   min-height: 0;
-  overflow: hidden;
   background: var(--bg-primary);
 }
 
 .viewport canvas {
+  width: 100%;
+  height: 100%;
   display: block;
-  width: 100% !important;
-  height: 100% !important;
   touch-action: none;
 }
 
-/* ===== Loading Screen ===== */
+/* --- Loading Screen --- */
 .loading-screen {
   position: absolute;
   inset: 0;
@@ -93,8 +198,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
-  transition: opacity 0.4s ease;
+  z-index: 10;
+  transition: opacity 400ms ease;
 }
 
 .loading-screen.fade-out {
@@ -112,17 +217,214 @@ html, body {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--border-color);
-  border-top-color: #4A90D9;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .loading-text {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+/* --- Info Card (base / mobile-first) --- */
+.info-card {
+  position: fixed;
+  bottom: var(--safe-bottom);
+  left: 0;
+  right: 0;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  padding-bottom: calc(20px + var(--safe-bottom));
+  max-height: 50vh;
+  overflow-y: auto;
+  z-index: 60;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition:
+    opacity 250ms ease,
+    transform 300ms ease;
+}
+
+.info-card.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  animation: slideUp 300ms ease forwards;
+}
+
+/* --- Info Card Header --- */
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  padding-right: 40px;
+}
+
+.info-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.info-names {
+  flex: 1;
+  min-width: 0;
+}
+
+.info-name-cn {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.info-name-en {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.info-close {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2a2a4a;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  transition: background 150ms ease;
+}
+
+.info-close:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+/* --- Info Description --- */
+.info-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-top: 12px;
+}
+
+/* ============================================
+   Desktop (> 768px)
+   ============================================ */
+@media (min-width: 769px) {
+  #app {
+    flex-direction: row;
+  }
+
+  /* Sidebar — static left panel */
+  .sidebar {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: 260px;
+    height: 100%;
+    max-height: none;
+    flex-shrink: 0;
+    border-radius: 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    backdrop-filter: none;
+    padding-top: var(--safe-top);
+    transition: none;
+  }
+
+  .sidebar.expanded {
+    height: 100%;
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  /* Info Card — right panel overlay */
+  .info-card {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    bottom: auto;
+    left: auto;
+    width: 320px;
+    max-height: calc(100% - 40px);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transform: translateY(-10px);
+    animation: none;
+  }
+
+  .info-card.visible {
+    transform: translateY(0);
+    animation: none;
+  }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3a5a;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a6a;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a5a transparent;
 }
