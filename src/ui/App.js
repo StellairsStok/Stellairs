@@ -1,4 +1,10 @@
 import { SceneManager } from '../interaction/SceneManager.js';
+import { BrainModel } from '../brain/BrainModel.js';
+import { BrainRaycaster } from '../interaction/Raycaster.js';
+import { CategoryTabs } from './CategoryTabs.js';
+import { ColorLegend } from './ColorLegend.js';
+import { InfoPanel } from './InfoPanel.js';
+import { LoadingScreen } from './LoadingScreen.js';
 
 export class App {
   constructor(root) {
@@ -12,57 +18,81 @@ export class App {
         <h1 class="app-title">BrainAtlas</h1>
         <span class="app-subtitle">3D 大脑解剖</span>
       </header>
-      <div class="viewport" id="viewport">
-        <div class="loading-screen" id="loading">
-          <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">正在加载大脑模型...</div>
-          </div>
-        </div>
-      </div>
+      <div id="category-tabs"></div>
+      <div class="viewport" id="viewport"></div>
+      <div id="color-legend"></div>
+      <div id="info-panel"></div>
     `;
 
     this.viewportEl = document.getElementById('viewport');
+
+    // Loading screen
+    this.loadingScreen = new LoadingScreen(this.viewportEl);
+
+    // Scene
     this.sceneManager = new SceneManager(this.viewportEl);
 
-    this._loadBrain();
+    // UI components
+    this.categoryTabs = new CategoryTabs(document.getElementById('category-tabs'));
+    this.colorLegend = new ColorLegend(document.getElementById('color-legend'));
+    this.infoPanel = new InfoPanel(document.getElementById('info-panel'));
+
+    // Build brain
+    this._initBrain();
   }
 
-  async _loadBrain() {
+  async _initBrain() {
     try {
-      const basePath = import.meta.env.BASE_URL || '/';
-      this.brainModel = await this.sceneManager.loadModel(`${basePath}brain.glb`);
+      this.brainModel = new BrainModel(this.sceneManager.scene);
 
-      // Apply a nice brain material to all meshes
-      this.brainModel.traverse((child) => {
-        if (child.isMesh) {
-          child.material = child.material.clone();
-          // Keep original material colors if they exist, otherwise set brain color
-          if (!child.material.map) {
-            child.material.color.setHex(0xd4a0a0);
-          }
-          child.material.roughness = 0.6;
-          child.material.metalness = 0.05;
-          child.material.side = 2; // DoubleSide
-        }
+      await this.brainModel.build((progress) => {
+        this.loadingScreen.setProgress(progress);
       });
 
-      // Hide loading screen
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.classList.add('fade-out');
-        setTimeout(() => loading.remove(), 400);
-      }
+      // Set up raycaster for interaction
+      this.raycaster = new BrainRaycaster(
+        this.sceneManager.camera,
+        this.sceneManager.renderer,
+        this.brainModel
+      );
+
+      this.raycaster.onRegionSelected((userData) => {
+        this.infoPanel.show(userData);
+      });
+
+      this.raycaster.onRegionDeselected(() => {
+        this.infoPanel.hide();
+      });
+
+      // Category tab switching
+      this.categoryTabs.onChange((categoryId) => {
+        this.brainModel.switchCategory(categoryId);
+        this.colorLegend.update(categoryId);
+        this.infoPanel.hide();
+        // Stop auto-rotate when user picks a category
+        this.sceneManager.controls.autoRotate = true;
+      });
+
+      // Default to lobes
+      this.categoryTabs.setActive('lobes');
+      this.brainModel.switchCategory('lobes');
+      this.colorLegend.update('lobes');
+
+      // Hide loading
+      this.loadingScreen.hide();
+
     } catch (err) {
-      console.error('Failed to load brain model:', err);
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.querySelector('.loading-text').textContent = '模型加载失败，请刷新重试';
+      console.error('Failed to build brain model:', err);
+      const loadingText = this.viewportEl.querySelector('.loading-text');
+      if (loadingText) {
+        loadingText.textContent = '模型构建失败，请刷新重试';
       }
     }
   }
 
   dispose() {
+    this.raycaster?.dispose();
+    this.brainModel?.dispose();
     this.sceneManager?.dispose();
   }
 }

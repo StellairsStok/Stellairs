@@ -1,16 +1,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export class SceneManager {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xfafbfc);
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -51,9 +50,6 @@ export class SceneManager {
     this._animate = this._animate.bind(this);
     this._animating = true;
     this._animate();
-
-    // GLTF Loader
-    this.loader = new GLTFLoader();
   }
 
   _setupLights() {
@@ -78,44 +74,6 @@ export class SceneManager {
     const bottom = new THREE.DirectionalLight(0xffeedd, 0.2);
     bottom.position.set(0, -5, 0);
     this.scene.add(bottom);
-  }
-
-  /**
-   * Load a GLB model and add to scene
-   * Returns the loaded model group
-   */
-  loadModel(url) {
-    return new Promise((resolve, reject) => {
-      this.loader.load(
-        url,
-        (gltf) => {
-          const model = gltf.scene;
-
-          // Center and scale the model
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 2.0 / maxDim; // Normalize to ~2 units
-
-          model.position.sub(center);
-          model.scale.setScalar(scale);
-
-          // Recalculate after centering
-          const newBox = new THREE.Box3().setFromObject(model);
-          const newCenter = newBox.getCenter(new THREE.Vector3());
-          this.controls.target.copy(newCenter);
-
-          this.scene.add(model);
-          resolve(model);
-        },
-        undefined,
-        (error) => {
-          console.error('Error loading model:', error);
-          reject(error);
-        }
-      );
-    });
   }
 
   _onResize() {
