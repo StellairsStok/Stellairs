@@ -166,7 +166,8 @@ export class SceneManager {
     this._focusedStructure = structureData;
     this.controls.autoRotate = false;
 
-    const pos = this.mniToScene(structureData.position);
+    const rawPos = structureData.position || (structureData.points ? structureData.points[Math.floor(structureData.points.length / 2)] : [0, 0, 0]);
+    const pos = this.mniToScene(rawPos);
     const dist = 0.8;
     const camTarget = pos.clone();
     const camPos = pos.clone().add(new THREE.Vector3(0, 0.2, dist));

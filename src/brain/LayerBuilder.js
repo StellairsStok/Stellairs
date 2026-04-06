@@ -43,9 +43,12 @@ export function buildLayer(category, sceneManager) {
       container.add(mesh);
     }
 
+    // For tubes, compute midpoint from points array; otherwise use position
+    const structPos = s.position || (s.points ? s.points[Math.floor(s.points.length / 2)] : [0, 0, 0]);
+
     // Leader line + label outside brain
-    const pos = sceneManager.mniToScene(s.position);
-    const labelOffset = computeLabelOffset(s.position);
+    const pos = sceneManager.mniToScene(structPos);
+    const labelOffset = computeLabelOffset(structPos);
     const labelPos = sceneManager.mniToScene(labelOffset);
 
     // Leader line
