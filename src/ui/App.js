@@ -1,11 +1,14 @@
 import { SceneManager } from '../interaction/SceneManager.js';
 import { brainData } from '../data/brainData.js';
-import { buildLayer } from '../brain/LayerBuilder.js';
+import { buildDeepLayer } from '../brain/LayerBuilder.js';
+import { paintBrain, resetBrainColors, SURFACE_REGIONS, CORTICAL_MARKERS } from '../brain/BrainPainter.js';
 
 const DEEP_CATEGORIES = new Set([
   'basal_ganglia', 'limbic', 'diencephalon', 'brainstem',
-  'ventricles', 'cerebellum',
+  'ventricles', 'cerebellum', 'cranial_nerves', 'vasculature',
 ]);
+
+const SURFACE_CATEGORIES = new Set(['lobes', 'cortical_areas']);
 
 export class App {
   constructor(root) {
@@ -27,11 +30,11 @@ export class App {
             <div class="loading-screen" id="loading">
               <div class="loading-content">
                 <div class="loading-spinner"></div>
-                <div class="loading-text" id="loading-text">正在加载大脑模型...</div>
+                <div class="loading-text" id="loading-text">\u6B63\u5728\u52A0\u8F7D\u5927\u8111\u6A21\u578B...</div>
               </div>
             </div>
           </div>
-          <button class="back-btn" id="back-btn">\u2190 返回总览</button>
+          <button class="back-btn" id="back-btn">\u2190 \u8FD4\u56DE\u603B\u89C8</button>
           <div class="lobe-legend" id="lobe-legend"></div>
           <div class="info-card" id="info-card"></div>
         </div>
@@ -60,11 +63,11 @@ export class App {
     try {
       this.sceneManager = new SceneManager(viewport);
 
-      loadingText.textContent = '正在加载大脑模型...';
+      loadingText.textContent = '\u6B63\u5728\u52A0\u8F7D\u5927\u8111\u6A21\u578B...';
       const modelUrl = new URL('brain.glb', window.location.href).href;
       await this.sceneManager.loadModel(modelUrl);
 
-      loadingText.textContent = '正在构建解剖结构...';
+      loadingText.textContent = '\u6B63\u5728\u6784\u5EFA\u89E3\u5256\u7ED3\u6784...';
       await this._buildLayers();
 
       this.sceneManager.onStructureHover = (data) => this._onHover(data);
@@ -79,7 +82,7 @@ export class App {
       }
     } catch (err) {
       console.error('BrainAtlas Error:', err);
-      if (loadingText) loadingText.textContent = '加载失败: ' + err.message;
+      if (loadingText) loadingText.textContent = '\u52A0\u8F7D\u5931\u8D25: ' + err.message;
     }
   }
 
@@ -87,14 +90,19 @@ export class App {
     const topbar = document.getElementById('topbar');
 
     for (const category of brainData.categories) {
-      let group;
-      try {
-        group = buildLayer(category, this.sceneManager);
-      } catch (err) {
-        console.error('Failed to build layer:', category.id, err);
-        continue;
+      const isSurface = SURFACE_CATEGORIES.has(category.id);
+
+      if (!isSurface) {
+        // Deep structure: build 3D geometry layer
+        let group;
+        try {
+          group = buildDeepLayer(category, this.sceneManager);
+        } catch (err) {
+          console.error('Failed to build layer:', category.id, err);
+          continue;
+        }
+        this.sceneManager.addLayer(category.id, group);
       }
-      this.sceneManager.addLayer(category.id, group);
 
       if (category.default_visible) {
         this.activeCategories.add(category.id);
@@ -121,37 +129,41 @@ export class App {
         } else {
           this.activeCategories.add(category.id);
           chip.classList.add('active');
-          this.sceneManager.setLayerVisible(category.id, true);
+          if (isSurface) {
+            this._repaintBrainSurface();
+          } else {
+            this.sceneManager.setLayerVisible(category.id, true);
+          }
           this._updateBrainOpacity();
           this._updateLobeLegend();
           this._openCategoryDropdown(category, chip);
         }
       });
 
+      const deactivate = () => {
+        this.activeCategories.delete(category.id);
+        chip.classList.remove('active');
+        chip.classList.remove('expanded');
+        if (isSurface) {
+          this._repaintBrainSurface();
+        } else {
+          this.sceneManager.setLayerVisible(category.id, false);
+        }
+        this._updateBrainOpacity();
+        this._closeDropdown();
+        this._updateLobeLegend();
+      };
+
       chip.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        if (this.activeCategories.has(category.id)) {
-          this.activeCategories.delete(category.id);
-          chip.classList.remove('active');
-          chip.classList.remove('expanded');
-          this.sceneManager.setLayerVisible(category.id, false);
-          this._updateBrainOpacity();
-          this._closeDropdown();
-          this._updateLobeLegend();
-        }
+        if (this.activeCategories.has(category.id)) deactivate();
       });
 
       let lastTap = 0;
       chip.addEventListener('touchend', (e) => {
         const now = Date.now();
         if (now - lastTap < 300 && this.activeCategories.has(category.id)) {
-          this.activeCategories.delete(category.id);
-          chip.classList.remove('active');
-          chip.classList.remove('expanded');
-          this.sceneManager.setLayerVisible(category.id, false);
-          this._updateBrainOpacity();
-          this._closeDropdown();
-          this._updateLobeLegend();
+          deactivate();
           e.preventDefault();
         }
         lastTap = now;
@@ -161,8 +173,27 @@ export class App {
       await new Promise(r => requestAnimationFrame(r));
     }
 
+    // Initial surface painting
+    this._repaintBrainSurface();
     this._updateBrainOpacity();
     this._updateLobeLegend();
+  }
+
+  _repaintBrainSurface() {
+    if (!this.sceneManager.brainWrapper) return;
+
+    const lobesActive = this.activeCategories.has('lobes');
+    const corticalActive = this.activeCategories.has('cortical_areas');
+
+    if (lobesActive && corticalActive) {
+      paintBrain(this.sceneManager.brainWrapper, 'both');
+    } else if (lobesActive) {
+      paintBrain(this.sceneManager.brainWrapper, 'lobes');
+    } else if (corticalActive) {
+      paintBrain(this.sceneManager.brainWrapper, 'cortical');
+    } else {
+      resetBrainColors(this.sceneManager.brainWrapper);
+    }
   }
 
   _openCategoryDropdown(category, chipEl) {
@@ -205,7 +236,12 @@ export class App {
     document.getElementById('dropdown-close-btn').addEventListener('click', () => {
       this.activeCategories.delete(category.id);
       chipEl.classList.remove('active');
-      this.sceneManager.setLayerVisible(category.id, false);
+      const isSurface = SURFACE_CATEGORIES.has(category.id);
+      if (isSurface) {
+        this._repaintBrainSurface();
+      } else {
+        this.sceneManager.setLayerVisible(category.id, false);
+      }
       this._updateBrainOpacity();
       this._updateLobeLegend();
       this._closeDropdown();
@@ -224,7 +260,7 @@ export class App {
 
   _buildLobeLegend(category) {
     const legend = document.getElementById('lobe-legend');
-    let html = '<div class="legend-title">脑叶 Lobes</div>';
+    let html = '<div class="legend-title">\u8111\u53F6 Lobes</div>';
     for (const s of category.structures) {
       html += `<div class="legend-item" data-name="${s.name_en}">
         <div class="legend-color" style="background:${s.color}"></div>
@@ -261,6 +297,7 @@ export class App {
   _unfocus() {
     this._focusedItem = null;
     this.sceneManager.resetFocus();
+    this._repaintBrainSurface();
     this._updateBrainOpacity();
     document.getElementById('back-btn').classList.remove('visible');
     document.getElementById('info-card').classList.remove('visible');
