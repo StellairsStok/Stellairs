@@ -128,20 +128,18 @@ export class SceneManager {
   }
 
   /**
-   * Convert MNI coordinates to scene space.
-   * MNI: X=left(-)/right(+), Y=posterior(-)/anterior(+), Z=inferior(-)/superior(+)
-   * Scene: X=right, Y=up, Z=toward camera (front)
-   * Brain model after normalization spans ~2 units ([-1,1] on longest axis).
-   * MNI coords span ~±80mm, so factor ≈ 1/80 = 0.0125
-   * DO NOT multiply by _brainScale (model already normalized).
+   * Convert model coordinates to scene space.
+   * Model axes match Three.js: X=left/right, Y=bottom/top, Z=back/front.
+   * scene = (model - center) * brainScale
    */
-  mniToScene(pos) {
+  modelToScene(pos) {
     if (!pos || !Array.isArray(pos)) return new THREE.Vector3(0, 0, 0);
-    const f = 0.011; // ~1/90, maps MNI mm to normalized scene units
+    const s = this._brainScale;
+    const c = this._brainCenter;
     return new THREE.Vector3(
-      (pos[0] || 0) * f,   // MNI X → scene X (left/right)
-      (pos[2] || 0) * f,   // MNI Z → scene Y (bottom/top)
-      (pos[1] || 0) * f    // MNI Y → scene Z (back/front, positive = anterior = toward camera)
+      ((pos[0] || 0) - c.x) * s,
+      ((pos[1] || 0) - c.y) * s,
+      ((pos[2] || 0) - c.z) * s
     );
   }
 
@@ -175,8 +173,9 @@ export class SceneManager {
     this._focusedStructure = structureData;
     this.controls.autoRotate = false;
 
-    const rawPos = structureData.position || (structureData.points ? structureData.points[Math.floor(structureData.points.length / 2)] : [0, 0, 0]);
-    const pos = this.mniToScene(rawPos);
+    const rawPos = structureData.position || (structureData.points ? structureData.points[Math.floor(structureData.points.length / 2)] : null);
+    if (!rawPos) return;
+    const pos = this.modelToScene(rawPos);
     const dist = 0.8;
     const camTarget = pos.clone();
     const camPos = pos.clone().add(new THREE.Vector3(0, 0.2, dist));
