@@ -20,44 +20,43 @@ export class App {
           </div>
         </div>
       </div>
+      <div class="controls-hint" id="controls-hint">
+        <span>拖动旋转 · 双指缩放</span>
+      </div>
     `;
 
     this.viewportEl = document.getElementById('viewport');
     this.sceneManager = new SceneManager(this.viewportEl);
-
     this._loadBrain();
   }
 
   async _loadBrain() {
+    const loading = document.getElementById('loading');
+    const loadingText = loading?.querySelector('.loading-text');
+
     try {
-      const basePath = import.meta.env.BASE_URL || '/';
-      this.brainModel = await this.sceneManager.loadModel(`${basePath}brain.glb`);
+      const basePath = import.meta.env.BASE_URL || './';
+      const model = await this.sceneManager.loadModel(`${basePath}brain.glb`);
+      this.brainModel = model;
 
-      // Apply a nice brain material to all meshes
-      this.brainModel.traverse((child) => {
-        if (child.isMesh) {
-          child.material = child.material.clone();
-          // Keep original material colors if they exist, otherwise set brain color
-          if (!child.material.map) {
-            child.material.color.setHex(0xd4a0a0);
-          }
-          child.material.roughness = 0.6;
-          child.material.metalness = 0.05;
-          child.material.side = 2; // DoubleSide
-        }
-      });
-
-      // Hide loading screen
-      const loading = document.getElementById('loading');
+      // Hide loading
       if (loading) {
         loading.classList.add('fade-out');
-        setTimeout(() => loading.remove(), 400);
+        setTimeout(() => loading.remove(), 500);
+      }
+
+      // Hide hint after a few seconds
+      const hint = document.getElementById('controls-hint');
+      if (hint) {
+        setTimeout(() => {
+          hint.classList.add('fade-out');
+          setTimeout(() => hint.remove(), 500);
+        }, 4000);
       }
     } catch (err) {
       console.error('Failed to load brain model:', err);
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.querySelector('.loading-text').textContent = '模型加载失败，请刷新重试';
+      if (loadingText) {
+        loadingText.textContent = '加载失败，请刷新重试';
       }
     }
   }
