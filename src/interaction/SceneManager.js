@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export class SceneManager {
   constructor(container) {
@@ -10,11 +10,12 @@ export class SceneManager {
     this.scene.background = new THREE.Color(0xf5f6f8);
     this.layers = {};
     this._hoveredMesh = null;
+    this._focusedStructure = null;
 
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || window.innerHeight;
 
-    // WebGL Renderer
+    // WebGL
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(w, h);
@@ -23,7 +24,7 @@ export class SceneManager {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
-    // CSS2D Renderer for labels
+    // CSS2D for labels
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.setSize(w, h);
     this.labelRenderer.domElement.style.position = 'absolute';
@@ -35,22 +36,23 @@ export class SceneManager {
     // Camera
     this.camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100);
     this.camera.position.set(0, 0.5, 2.8);
+    this._defaultCamPos = this.camera.position.clone();
+    this._defaultTarget = new THREE.Vector3(0, 0, 0);
 
     // Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.minDistance = 0.5;
+    this.controls.minDistance = 0.3;
     this.controls.maxDistance = 8;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.6;
+    this.controls.autoRotateSpeed = 0.5;
     this.controls.enablePan = true;
     this.controls.target.set(0, 0, 0);
 
-    // Lights
     this._setupLights();
 
-    // Raycaster for hover
+    // Raycaster
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2(-999, -999);
     this._onPointerMove = this._onPointerMove.bind(this);
@@ -64,9 +66,10 @@ export class SceneManager {
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
 
-    // Animate
+    // Animation
     this._animate = this._animate.bind(this);
     this._animating = true;
+    this._tweens = [];
     this._animate();
 
     this.loader = new GLTFLoader();
@@ -103,7 +106,6 @@ export class SceneManager {
         wrapper.scale.setScalar(this._brainScale);
         wrapper.name = 'brainModel';
 
-        // Make brain slightly transparent by default
         model.traverse((child) => {
           if (child.isMesh) {
             child.material = child.material.clone();
@@ -125,14 +127,8 @@ export class SceneManager {
     });
   }
 
-  /**
-   * Convert MNI-like coordinates to scene coordinates
-   * MNI: X=left/right, Y=inf/sup, Z=post/ant → Three.js: X=right, Y=up, Z=front
-   */
   mniToScene(pos) {
     const s = this._brainScale || 1;
-    // Map MNI [x,y,z] → Three.js [x, z, -y] scaled
-    // MNI X → scene X, MNI Y → scene Z (ant-post), MNI Z → scene Y (inf-sup)
     return new THREE.Vector3(
       pos[0] * s * 0.012,
       pos[2] * s * 0.012,
@@ -162,13 +158,91 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Focus camera on a structure, dim everything else.
+   */
+  focusOnStructure(structureData) {
+    if (!structureData) return;
+    this._focusedStructure = structureData;
+    this.controls.autoRotate = false;
+
+    const pos = this.mniToScene(structureData.position);
+    const dist = 0.8;
+    const camTarget = pos.clone();
+    const camPos = pos.clone().add(new THREE.Vector3(0, 0.2, dist));
+
+    this._animateTo(camPos, camTarget, 600);
+    this._dimNonFocused(structureData);
+    this.setBrainOpacity(0.1);
+  }
+
+  resetFocus() {
+    this._focusedStructure = null;
+    this.controls.autoRotate = true;
+    this._animateTo(this._defaultCamPos.clone(), this._defaultTarget.clone(), 500);
+    this._restoreAllOpacity();
+  }
+
+  _dimNonFocused(focusedData) {
+    for (const [, group] of Object.entries(this.layers)) {
+      if (!group.visible) continue;
+      group.children.forEach(container => {
+        container.traverse(child => {
+          if (child.isMesh && child.userData.name_cn) {
+            const isFocused = child.userData.name_en === focusedData.name_en;
+            if (!isFocused) {
+              child._savedOpacity = child.material.opacity;
+              child.material.opacity = 0.08;
+              child.material.transparent = true;
+              child.material.depthWrite = false;
+            } else {
+              child.material.opacity = 1.0;
+              child.material.depthWrite = true;
+            }
+          }
+        });
+      });
+    }
+  }
+
+  _restoreAllOpacity() {
+    for (const [, group] of Object.entries(this.layers)) {
+      group.children.forEach(container => {
+        container.traverse(child => {
+          if (child.isMesh && child._savedOpacity !== undefined) {
+            child.material.opacity = child._savedOpacity;
+            child.material.depthWrite = child._savedOpacity > 0.5;
+            delete child._savedOpacity;
+          }
+        });
+      });
+    }
+  }
+
+  _animateTo(targetPos, targetLookAt, duration) {
+    const startPos = this.camera.position.clone();
+    const startTarget = this.controls.target.clone();
+    const startTime = performance.now();
+
+    const tween = { active: true };
+    tween.update = (now) => {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      this.camera.position.lerpVectors(startPos, targetPos, ease);
+      this.controls.target.lerpVectors(startTarget, targetLookAt, ease);
+      if (t >= 1) tween.active = false;
+    };
+    this._tweens.push(tween);
+  }
+
   _onPointerMove(event) {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
-  _onClick(event) {
+  _onClick() {
     if (this._hoveredMesh && this.onStructureClick) {
       this.onStructureClick(this._hoveredMesh.userData);
     }
@@ -176,19 +250,15 @@ export class SceneManager {
 
   _checkHover() {
     this.raycaster.setFromCamera(this.pointer, this.camera);
-
     const interactable = [];
     for (const [, group] of Object.entries(this.layers)) {
       if (!group.visible) continue;
       group.traverse((child) => {
-        if (child.isMesh && child.userData.name_cn) {
-          interactable.push(child);
-        }
+        if (child.isMesh && child.userData.name_cn) interactable.push(child);
       });
     }
 
     const intersects = this.raycaster.intersectObjects(interactable, false);
-
     if (intersects.length > 0) {
       const hit = intersects[0].object;
       if (this._hoveredMesh !== hit) {
@@ -225,6 +295,13 @@ export class SceneManager {
   _animate() {
     if (!this._animating) return;
     requestAnimationFrame(this._animate);
+
+    const now = performance.now();
+    this._tweens = this._tweens.filter(t => {
+      if (t.active) { t.update(now); return true; }
+      return false;
+    });
+
     this.controls.update();
     this._checkHover();
     this.renderer.render(this.scene, this.camera);
