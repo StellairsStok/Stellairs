@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './',
+  // GitHub Pages: repository is served at /Stellairs/
+  // This MUST match the repo name exactly (case-sensitive).
+  base: '/Stellairs/',
 });

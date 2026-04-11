@@ -126,7 +126,9 @@ export class App {
       this.sceneManager = new SceneManager(viewport);
 
       loadingText.textContent = '正在加载大脑模型…';
-      const modelUrl = new URL('brain.glb', window.location.href).href;
+      // import.meta.env.BASE_URL is set by Vite at build time to '/Stellairs/'
+      // so the resolved URL is always correct regardless of page location.
+      const modelUrl = import.meta.env.BASE_URL + 'brain.glb';
       await this.sceneManager.loadModel(modelUrl);
 
       loadingText.textContent = '正在构建解剖结构…';
