@@ -130,6 +130,7 @@ export function paintBrainCombined(brainWrapper) {
 
 /**
  * Reset brain to default unpainted color.
+ * Also disables vertex colors so the material's own color shows.
  */
 export function resetBrainColors(brainWrapper) {
   brainWrapper.traverse((child) => {
@@ -141,5 +142,9 @@ export function resetBrainColors(brainWrapper) {
       }
       colorAttr.needsUpdate = true;
     }
+    // Restore base color so brain is visible even without vertex colors
+    child.material.vertexColors = false;
+    child.material.color.setHex(0xe8cec2);
+    child.material.needsUpdate = true;
   });
 }

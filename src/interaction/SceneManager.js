@@ -133,16 +133,21 @@ export class SceneManager {
 
         model.traverse((child) => {
           if (!child.isMesh) return;
-          child.material = child.material.clone();
-          child.material.roughness   = 0.58;
-          child.material.metalness   = 0.04;
-          child.material.side        = THREE.DoubleSide;
-          child.material.transparent = true;
-          child.material.opacity     = 1.0;
-          // Only set default color when no texture is present
-          if (!child.material.map) {
-            child.material.color.setHex(0xe8cec2);
-          }
+          // ⚠️ REPLACE the GLB material entirely instead of cloning it.
+          // The original GLB material is deep-blue (baseColorFactor≈[0.18,0.40,0.56])
+          // and its transparent/opacity flags can be unpredictable.  A fresh
+          // MeshPhysicalMaterial guarantees visibility at all times.
+          child.material = new THREE.MeshPhysicalMaterial({
+            color:              0xe8cec2,  // warm brain-tissue beige
+            roughness:          0.60,
+            metalness:          0.04,
+            clearcoat:          0.30,
+            clearcoatRoughness: 0.45,
+            side:               THREE.DoubleSide,
+            transparent:        false,    // opaque by default → opaque render pass
+            opacity:            1.0,
+            depthWrite:         true,
+          });
         });
 
         this.scene.add(wrapper);
@@ -174,9 +179,10 @@ export class SceneManager {
     if (!this.brainWrapper) return;
     this.brainWrapper.traverse((child) => {
       if (!child.isMesh) return;
-      child.material.opacity    = opacity;
-      child.material.transparent = true;
+      child.material.opacity     = opacity;
+      child.material.transparent = opacity < 1.0;   // opaque pass when opacity==1
       child.material.depthWrite  = opacity > 0.5;
+      child.material.needsUpdate = true;
     });
   }
 
