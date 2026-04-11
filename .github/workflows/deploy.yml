@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ['claude/add-capabilities-docs-UPC6a']
+    branches:
+      - 'claude/add-capabilities-docs-UPC6a'
+      - 'claude/fix-brain-model-issues-6kDJt'
 
 permissions:
   contents: read
